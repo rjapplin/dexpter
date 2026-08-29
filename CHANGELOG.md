@@ -1,5 +1,9 @@
 # Changelog
 
+All notable changes to dexpter are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and dexpter follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
 
 Nothing yet.
@@ -49,6 +53,7 @@ Initial release.
   tagging, transitive link traversal, pipeline reconstruction.
 - **Tests** — standard-library `unittest` suite, no test dependencies
   (`python -m unittest discover`).
+- `dexpter.__version__`.
 
 [Unreleased]: https://github.com/rjapplin/dexpter/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/rjapplin/dexpter/releases/tag/v1.0.0

@@ -305,8 +305,11 @@ class Dexpter:
 def _is_iso(value):
     if not isinstance(value, str):
         return False
+    # A trailing 'Z' isn't accepted by fromisoformat before Python 3.11;
+    # normalize it so validation behaves the same on every supported version.
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
     try:
-        datetime.fromisoformat(value)
+        datetime.fromisoformat(normalized)
     except ValueError:
         return False
     return True

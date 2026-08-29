@@ -3,10 +3,22 @@
 **d**ata science **exp**eriment **t**rack**er** — a lightweight, flexible
 JSON-backed experiment tracker for data science work.
 
-No server, no database, no dependencies beyond the Python standard library.
+No server, no daemon, no dependencies beyond the Python standard library.
 A dexpter "database" is a single JSON file. Each top-level key is one
 experiment id; each value is that experiment's record, made of whatever
 arbitrary fields you choose to log.
+
+Tools like MLflow, Aim, and W&B are excellent for mature pipelines, but I've
+found no good fit for in-flight work that hasn't reached a first release —
+where what you track changes day to day. That's what dexpter is for. Beyond
+a little structure and a few guardrails, it's built to stay as lightweight
+and flexible as possible.
+
+If today you're evaluating against MAPE but tomorrow the team decides MSE is
+the better metric, dexpter doesn't care: `run_yesterday` can carry a `MAPE`
+field while `run_today` carries `MSE`. Prefer consistency? Use `eval_metric`
+and `eval_metric_value` fields instead. dexpter has no opinion and will
+happily support whatever fits your flow.
 
 ## Install
 
@@ -27,9 +39,11 @@ Installing gives you both:
 
 ## Core concepts
 
-- **Database file**: one JSON file = one body of work / project. Pick any
-  path and extension you like (`experiments.json`, `runs.dexpter`, etc.) —
-  the extension is cosmetic, the content is always plain JSON.
+- **Database file**: one JSON file = one database. It usually makes sense for
+  one database to cover a single body of work or project, but that's just
+  convention — pick any path and extension you like (`experiments.json`,
+  `runs.dexpter`, etc.); the extension is cosmetic, the content is always
+  plain JSON.
 - **Experiment**: one entry in that file, identified by a string id you
   choose (e.g. `"resnet18_baseline"`). Logging the same id again updates
   that experiment in place rather than creating a duplicate.

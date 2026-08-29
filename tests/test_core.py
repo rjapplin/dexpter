@@ -159,6 +159,14 @@ class RequiredFields(CoreTestCase):
             db.set_required_fields(["created_at"])
 
 
+class Packaging(unittest.TestCase):
+    def test_version_attribute(self):
+        import dexpter
+
+        self.assertIsInstance(dexpter.__version__, str)
+        self.assertRegex(dexpter.__version__, r"^\d+\.\d+\.\d+")
+
+
 class AtomicWrite(CoreTestCase):
     def test_failed_save_leaves_file_intact_and_no_tmp(self):
         db = Dexpter.init(self.path())

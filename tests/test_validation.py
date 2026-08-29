@@ -103,6 +103,13 @@ class ValidationTestCase(unittest.TestCase):
         self.edit(lambda d: d["a"].update(created_at="yesterday"))
         self.assertTrue(any("unparseable 'created_at'" in w for w in self.report()["warnings"]))
 
+    def test_z_suffixed_timestamp_is_accepted(self):
+        # 'Z' offsets should validate the same on every supported Python
+        self.edit(lambda d: d["a"].update(created_at="2026-01-01T00:00:00Z"))
+        self.assertFalse(
+            any("unparseable 'created_at'" in w for w in self.report()["warnings"])
+        )
+
     def test_updated_before_created(self):
         self.edit(lambda d: d["a"].update(created_at="2030-01-01T00:00:00+00:00"))
         self.assertTrue(
