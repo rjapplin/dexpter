@@ -1,5 +1,7 @@
 # dexpter
 
+[![test](https://github.com/rjapplin/dexpter/actions/workflows/test.yml/badge.svg)](https://github.com/rjapplin/dexpter/actions/workflows/test.yml)
+
 **d**ata science **exp**eriment **t**rack**er** — a lightweight, flexible
 JSON-backed experiment tracker for data science work.
 
