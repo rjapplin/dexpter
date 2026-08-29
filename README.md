@@ -140,7 +140,9 @@ db.links("feat_gen_v1")     # -> ['training_run3']
 
 Links are stored centrally in the `__dexpter__` metadata block, not on the
 experiment records, so `db.get(...)` / `db.experiments` stay exactly as they
-were. `db.links(id)` returns direct neighbours only (no transitive walk).
+were. `db.links(id)` returns direct neighbours only (transitive walks
+aren't natively supported but can easily be added as shown in
+[`examples/recipes/`](examples/recipes/)).
 Deleting an experiment drops every link that referenced it.
 
 ## Integrity
@@ -292,6 +294,16 @@ python -m unittest discover
 ```
 
 Release history is in [CHANGELOG.md](CHANGELOG.md).
+
+## Disclosure
+
+dexpter was primarily vibe coded with Claude Code (Sonnet 5). There
+are almost certainly signs of AI usage in the main code. If
+you aren't down with that, totally fair. dexpter works for me
+and does what I need it to do and lets me focus on making sure
+my data science code is good code. If you try dexpter and it works
+for you, great! And if you try it (or don't try it) and don't think
+it's for you, that's fine too!
 
 ## License
 
