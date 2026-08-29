@@ -276,3 +276,9 @@ Tests are standard-library `unittest` — no test dependencies:
 ```bash
 python -m unittest discover
 ```
+
+Release history is in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE). © 2026 R. Jacob Applin.

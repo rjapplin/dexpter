@@ -1,14 +1,18 @@
 [project]
 name = "dexpter"
-version = "0.1.0"
+version = "1.0.0"
 description = "Lightweight, flexible JSON-backed data science experiment tracker"
+readme = "README.md"
 requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "R. Jacob Applin" }]
 
 [project.scripts]
 dexpter = "dexpter.cli:main"
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
