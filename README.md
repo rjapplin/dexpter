@@ -15,6 +15,12 @@ From the dexpter project directory (this repo):
 ```bash
 pip install -e /path/to/dexpter
 ```
+
+Use `-e` (editable) if dexpter's own source may still change and you want
+that reflected immediately without reinstalling. Drop `-e` for a normal
+pinned install. This works from any other project's venv — dexpter doesn't
+need to be published anywhere; pip builds it from the local path.
+
 Installing gives you both:
 - the `dexpter` Python package (`from dexpter import Dexpter, DexpterError`)
 - a `dexpter` CLI command
@@ -180,8 +186,8 @@ sealed file catching an out-of-band change.
 
 [`examples/recipes/`](examples/recipes/) has small copy-and-adapt templates
 for patterns you can layer on the public API — field history, experiment
-diffing, tagging, pipeline reconstruction — none of which need to be in the
-core.
+diffing, tagging, transitive link traversal, pipeline reconstruction — none
+of which need to be in the core.
 
 ## CLI
 

@@ -9,6 +9,7 @@ your project and adapt.
 | `field_history.py` | Record when each field first appeared on an experiment |
 | `experiment_diff.py` | Diff two experiment records, `git diff` style |
 | `tagging.py` | Tag experiments and query by tag |
+| `link_traversal.py` | Transitive walk over links: reachable set, hop distances, shortest path |
 | `pipeline_reconstruction.py` | Rebuild a linked pipeline and put it in run order |
 
 ```bash
