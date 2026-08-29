@@ -15,12 +15,6 @@ From the dexpter project directory (this repo):
 ```bash
 pip install -e /path/to/dexpter
 ```
-
-Use `-e` (editable) if dexpter's own source may still change and you want
-that reflected immediately without reinstalling. Drop `-e` for a normal
-pinned install. This works from any other project's venv — dexpter doesn't
-need to be published anywhere; pip builds it from the local path.
-
 Installing gives you both:
 - the `dexpter` Python package (`from dexpter import Dexpter, DexpterError`)
 - a `dexpter` CLI command
