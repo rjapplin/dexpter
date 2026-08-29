@@ -137,6 +137,11 @@ dependency to dexpter itself:
 python examples/pipeline_demo.py
 ```
 
+[`examples/recipes/`](examples/recipes/) has small copy-and-adapt templates
+for patterns you can layer on the public API — field history, experiment
+diffing, tagging, pipeline reconstruction — none of which need to be in the
+core.
+
 ## CLI
 
 ```bash
