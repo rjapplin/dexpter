@@ -1,11 +1,18 @@
 import argparse
 import json
 import sys
+import warnings
 
 from .core import Dexpter, DexpterError
 
 
+def _show_warning(message, category, filename, lineno, file=None, line=None):
+    print(f"warning: {message}", file=sys.stderr)
+
+
 def main(argv=None):
+    warnings.showwarning = _show_warning
+
     parser = argparse.ArgumentParser(
         prog="dexpter", description="Lightweight JSON-backed data science experiment tracker"
     )
@@ -20,6 +27,11 @@ def main(argv=None):
         dest="required_fields",
         metavar="FIELD",
         help="Field that must be set on every experiment (repeatable)",
+    )
+    p_init.add_argument(
+        "--seal",
+        action="store_true",
+        help="Turn on tamper-evidence: warn on load if the file changed outside dexpter",
     )
 
     p_list = sub.add_parser("list", help="List experiments in a database")
@@ -52,14 +64,29 @@ def main(argv=None):
     p_links.add_argument("path")
     p_links.add_argument("experiment_id")
 
+    p_check = sub.add_parser(
+        "check", help="Check a database file for structural problems / tampering"
+    )
+    p_check.add_argument("path")
+
+    p_seal = sub.add_parser("seal", help="Turn on tamper-evidence (content hashing)")
+    p_seal.add_argument("path")
+
+    p_unseal = sub.add_parser("unseal", help="Turn off tamper-evidence")
+    p_unseal.add_argument("path")
+
     args = parser.parse_args(argv)
 
     try:
         if args.command == "init":
-            db = Dexpter.init(args.path, required_fields=args.required_fields)
+            db = Dexpter.init(
+                args.path, required_fields=args.required_fields, sealed=args.seal
+            )
             print(f"Initialized DEXPTER database at {args.path}")
             if db.required_fields:
                 print(f"required fields: {', '.join(db.required_fields)}")
+            if db.sealed:
+                print("sealed: on")
 
         elif args.command == "list":
             db = Dexpter.load(args.path)
@@ -123,6 +150,35 @@ def main(argv=None):
                 print("(no links)")
             for exp_id in linked:
                 print(exp_id)
+
+        elif args.command == "check":
+            report = Dexpter.validate(args.path)
+            for msg in report["errors"]:
+                print(f"error:   {msg}", file=sys.stderr)
+            for msg in report["warnings"]:
+                print(f"warning: {msg}", file=sys.stderr)
+            if report["seal"] == "ok":
+                print("seal:    intact")
+            elif report["seal"] == "mismatch":
+                print(
+                    "error:   sealed database changed outside dexpter (hash mismatch)",
+                    file=sys.stderr,
+                )
+            clean = not report["errors"] and not report["warnings"]
+            if clean and report["seal"] in ("ok", "unsealed"):
+                print("ok: no problems found")
+            if report["errors"] or report["seal"] == "mismatch":
+                sys.exit(1)
+
+        elif args.command == "seal":
+            db = Dexpter.load(args.path)
+            db.seal()
+            print(f"sealed {args.path}")
+
+        elif args.command == "unseal":
+            db = Dexpter.load(args.path)
+            db.unseal()
+            print(f"unsealed {args.path}")
     except DexpterError as e:
         print(f"error: {e}", file=sys.stderr)
         sys.exit(1)

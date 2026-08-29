@@ -1,3 +1,3 @@
-from .core import Dexpter, DexpterError
+from .core import Dexpter, DexpterError, DexpterSealWarning
 
-__all__ = ["Dexpter", "DexpterError"]
+__all__ = ["Dexpter", "DexpterError", "DexpterSealWarning"]

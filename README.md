@@ -90,13 +90,18 @@ gaps = db.set_required_fields(["description", "owner"])
 # gaps = {experiment_id: [missing_field, ...]} for any existing experiments
 # that don't satisfy the new requirement yet (informational, not blocking —
 # but the *next* log() call on one of those ids will enforce it)
+
+# Check a file for damage from hand-editing outside the API
+report = Dexpter.validate("experiments.json")
+# {"errors": [...], "warnings": [...], "seal": "unsealed"}
 ```
 
 `DexpterError` is raised for: missing required fields, attempting to set a
 reserved field (`id`/`created_at`/`updated_at`), calling `init()` on a path
 that already exists (pass `exist_ok=True` to reuse it instead),
-`load()`/`delete()` on something that doesn't exist, or linking to a
-nonexistent experiment / linking an experiment to itself.
+`load()`/`delete()` on something that doesn't exist, linking to a
+nonexistent experiment / linking an experiment to itself, or `load()`ing a
+file with structural damage (see [Integrity](#integrity)).
 
 ## Linking experiments
 
@@ -124,6 +129,43 @@ experiment records, so `db.get(...)` / `db.experiments` stay exactly as they
 were. `db.links(id)` returns direct neighbours only (no transitive walk).
 Deleting an experiment drops every link that referenced it.
 
+## Integrity
+
+Editing the JSON file by hand is fine and supported — but a careless editor
+save can break it. Two levels of protection:
+
+**Structural check** — `Dexpter.validate(path)` (or `dexpter check <path>`)
+reports:
+
+- `errors` — the file no longer matches dexpter's shape and the API may
+  misbehave: not an object, a record that isn't an object, an `id` field
+  that disagrees with its key, a malformed `links` list. `load()` refuses a
+  file with errors unless you pass `validate=False`.
+- `warnings` — still usable, but an invariant was lost: a missing/`unparseable`
+  `created_at`/`updated_at`, `updated_at` before `created_at`, a link to an
+  id that no longer exists, a record missing a required field.
+
+Editing a *value* (say fixing `lr: 0.01` → `0.02`) is not flagged — that's a
+supported edit.
+
+**Sealing (opt-in tamper-evidence)** — off by default. When on, every write
+stores a hash of the contents in `__dexpter__`, and `load()` warns
+(`DexpterSealWarning`) if *anything* changed outside dexpter, including
+deliberate value edits.
+
+```python
+db = Dexpter.init("experiments.json", sealed=True)   # or db.seal() any time
+db.sealed            # True
+db.verify_seal()     # True (matches) / False (changed) / None (not sealed)
+db.seal()            # re-baseline: accept the current file as the new truth
+db.unseal()          # turn it back off, drop the stored hash
+```
+
+The hash is computed over a canonical form, so reformatting the file (`jq`,
+an IDE "format document", whitespace) doesn't trip it — only changed values
+do. It's tamper-*evidence*, not protection: the hash lives in the same file
+and anyone can recompute it.
+
 ## Example
 
 [`examples/pipeline_demo.py`](examples/pipeline_demo.py) runs a four-stage
@@ -136,6 +178,11 @@ dependency to dexpter itself:
 ```bash
 python examples/pipeline_demo.py
 ```
+
+[`examples/integrity_demo.py`](examples/integrity_demo.py) walks through the
+structural check and sealing — a legit value edit passing, a careless edit
+producing warnings, structural damage being refused by `load()`, and a
+sealed file catching an out-of-band change.
 
 [`examples/recipes/`](examples/recipes/) has small copy-and-adapt templates
 for patterns you can layer on the public API — field history, experiment
@@ -164,6 +211,13 @@ dexpter require experiments.json --remove owner
 dexpter link experiments.json training_run3 feat_gen_v1
 dexpter unlink experiments.json training_run3 feat_gen_v1
 dexpter links experiments.json training_run3
+
+# Check the file for structural damage / tampering (exit 1 on errors)
+dexpter check experiments.json
+
+# Tamper-evidence (also: dexpter init --seal)
+dexpter seal experiments.json
+dexpter unseal experiments.json
 ```
 
 The CLI is read/inspect + schema/link management only — logging experiment
@@ -175,11 +229,11 @@ experiments that have links; `show` prints a `links:` line (on stderr, so
 ## File format
 
 The JSON file is just a plain object. A reserved `__dexpter__` top-level key
-holds metadata (`required_fields` and `links`) and is hidden from
-`db.experiments`, `len(db)`, `in`, and iteration — you'll never see it
-unless you open the raw file yourself. Each entry in `links` is a
-`[id_a, id_b]` pair, stored sorted and deduplicated, so the file stays
-stable across diffs.
+holds metadata (`required_fields`, `links`, and — only when sealing is on —
+`sealed` / `content_hash`) and is hidden from `db.experiments`, `len(db)`,
+`in`, and iteration — you'll never see it unless you open the raw file
+yourself. Each entry in `links` is a `[id_a, id_b]` pair, stored sorted and
+deduplicated, so the file stays stable across diffs.
 
 ```json
 {

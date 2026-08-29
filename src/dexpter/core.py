@@ -1,6 +1,8 @@
+import hashlib
 import json
 import os
 import tempfile
+import warnings as _warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,18 +14,25 @@ class DexpterError(Exception):
     pass
 
 
+class DexpterSealWarning(UserWarning):
+    """Warned by load() when a sealed database was changed outside dexpter."""
+
+
 class Dexpter:
     """A JSON-backed store of experiments, keyed by experiment id."""
 
     def __init__(self, path, data):
         self.path = Path(path)
         self._data = data
-        meta = self._data.setdefault(_META_KEY, {})
+        meta = self._data.get(_META_KEY)
+        if not isinstance(meta, dict):
+            meta = {}
+            self._data[_META_KEY] = meta
         meta.setdefault("required_fields", [])
         meta.setdefault("links", [])
 
     @classmethod
-    def init(cls, path, required_fields=None, exist_ok=False):
+    def init(cls, path, required_fields=None, exist_ok=False, sealed=False):
         path = Path(path)
         if path.exists():
             if not exist_ok:
@@ -35,19 +44,82 @@ class Dexpter:
         if bad:
             raise DexpterError(f"Cannot require reserved field(s): {sorted(bad)}")
 
-        data = {_META_KEY: {"required_fields": required_fields, "links": []}}
-        db = cls(path, data)
+        meta = {"required_fields": required_fields, "links": []}
+        if sealed:
+            meta["sealed"] = True
+        db = cls(path, {_META_KEY: meta})
         db._save()
         return db
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, validate=True):
         path = Path(path)
         if not path.exists():
             raise DexpterError(f"'{path}' does not exist. Call Dexpter.init() first.")
         with open(path) as f:
             data = json.load(f)
-        return cls(path, data)
+
+        if validate:
+            report = _validate_data(data)
+            if report["errors"]:
+                raise DexpterError(
+                    f"'{path}' is structurally broken: "
+                    + "; ".join(report["errors"])
+                    + "  (pass validate=False to load anyway, or run `dexpter check`)"
+                )
+
+        db = cls(path, data)
+
+        meta = data.get(_META_KEY) if isinstance(data, dict) else None
+        if (
+            isinstance(meta, dict)
+            and meta.get("sealed")
+            and isinstance(meta.get("content_hash"), str)
+            and _canonical_hash(data) != meta["content_hash"]
+        ):
+            _warnings.warn(
+                f"'{path}' has changed outside dexpter since it was last sealed "
+                f"(content hash mismatch). Call .seal() again to accept the "
+                f"current contents.",
+                DexpterSealWarning,
+                stacklevel=2,
+            )
+        return db
+
+    @classmethod
+    def validate(cls, path):
+        """Inspect a database file for problems introduced outside the API.
+
+        Returns {"errors": [...], "warnings": [...], "seal": <str>}:
+          errors   -- structurally broken; load(validate=True) will refuse it
+          warnings -- usable but sloppy (hand-edited, lost an invariant)
+          seal     -- "ok" | "mismatch" | "unsealed" | "unknown"
+        Only raises if the file is missing.
+        """
+        path = Path(path)
+        if not path.exists():
+            raise DexpterError(f"'{path}' does not exist.")
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            return {"errors": [f"not valid JSON: {e}"], "warnings": [], "seal": "unknown"}
+
+        report = _validate_data(data)
+
+        seal = "unsealed"
+        meta = data.get(_META_KEY) if isinstance(data, dict) else None
+        if isinstance(meta, dict) and meta.get("sealed"):
+            stored = meta.get("content_hash")
+            if not isinstance(stored, str):
+                report["warnings"].append("database is sealed but has no content_hash")
+                seal = "unknown"
+            elif stored == _canonical_hash(data):
+                seal = "ok"
+            else:
+                seal = "mismatch"
+        report["seal"] = seal
+        return report
 
     @property
     def required_fields(self):
@@ -166,6 +238,37 @@ class Dexpter:
         links.sort()
         return True
 
+    # -- sealing (opt-in tamper-evidence) -----------------------------------
+
+    @property
+    def sealed(self):
+        return bool(self._data[_META_KEY].get("sealed"))
+
+    def seal(self):
+        """Turn on tamper-evidence. From now on every save stores a hash of
+        the contents, and load() warns (DexpterSealWarning) if the file was
+        changed outside dexpter. Call again at any time to re-baseline after
+        deliberate external edits.
+        """
+        self._data[_META_KEY]["sealed"] = True
+        self._save()
+
+    def unseal(self):
+        """Turn tamper-evidence back off and drop the stored hash."""
+        meta = self._data[_META_KEY]
+        meta.pop("sealed", None)
+        meta.pop("content_hash", None)
+        self._save()
+
+    def verify_seal(self):
+        """True if sealed and the contents match the stored hash, False if
+        sealed and they don't, None if the database isn't sealed.
+        """
+        meta = self._data[_META_KEY]
+        if not meta.get("sealed"):
+            return None
+        return meta.get("content_hash") == _canonical_hash(self._data)
+
     # ----------------------------------------------------------------------
 
     @property
@@ -182,6 +285,11 @@ class Dexpter:
         return iter(k for k in self._data if k != _META_KEY)
 
     def _save(self):
+        meta = self._data[_META_KEY]
+        meta.pop("content_hash", None)
+        if meta.get("sealed"):
+            meta["content_hash"] = _canonical_hash(self._data)
+
         fd, tmp_path = tempfile.mkstemp(
             dir=self.path.parent or ".", prefix=f".{self.path.name}.", suffix=".tmp"
         )
@@ -192,3 +300,125 @@ class Dexpter:
         except BaseException:
             os.unlink(tmp_path)
             raise
+
+
+def _is_iso(value):
+    if not isinstance(value, str):
+        return False
+    try:
+        datetime.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _canonical_hash(data):
+    """SHA-256 of the database contents in a canonical form: reformatting
+    (whitespace, key order) does not change it, but edited values do. The
+    stored `content_hash` field itself is excluded.
+    """
+    payload = dict(data)
+    meta = payload.get(_META_KEY)
+    if isinstance(meta, dict):
+        payload[_META_KEY] = {k: v for k, v in meta.items() if k != "content_hash"}
+    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _validate_data(data):
+    """Structural check of a parsed database. Returns {"errors", "warnings"}.
+
+    errors   -- the file no longer matches dexpter's shape and the API may
+                misbehave on it
+    warnings -- the file still works but an invariant the API maintains was
+                lost (usually a careless hand-edit)
+    """
+    errors = []
+    warnings = []
+
+    if not isinstance(data, dict):
+        return {"errors": ["top-level value is not a JSON object"], "warnings": []}
+
+    meta = data.get(_META_KEY)
+    if meta is None:
+        warnings.append(f"missing '{_META_KEY}' metadata block")
+        meta = {}
+    elif not isinstance(meta, dict):
+        errors.append(f"'{_META_KEY}' is not an object")
+        meta = {}
+
+    required_fields = meta.get("required_fields", [])
+    if not isinstance(required_fields, list) or not all(
+        isinstance(f, str) for f in required_fields
+    ):
+        errors.append("'required_fields' is not a list of strings")
+        required_fields = []
+
+    raw_links = meta.get("links", [])
+    links = []
+    if not isinstance(raw_links, list):
+        errors.append("'links' is not a list")
+    else:
+        for i, edge in enumerate(raw_links):
+            if (
+                isinstance(edge, list)
+                and len(edge) == 2
+                and all(isinstance(x, str) for x in edge)
+            ):
+                links.append(edge)
+            else:
+                errors.append(
+                    f"links[{i}] is not an [id_a, id_b] pair of strings: {edge!r}"
+                )
+
+    content_hash = meta.get("content_hash")
+    if content_hash is not None and not isinstance(content_hash, str):
+        errors.append("'content_hash' is not a string")
+
+    experiment_ids = [k for k in data if k != _META_KEY]
+
+    for exp_id in experiment_ids:
+        record = data[exp_id]
+        if not isinstance(record, dict):
+            errors.append(f"experiment '{exp_id}' is not an object")
+            continue
+
+        if "id" not in record:
+            warnings.append(f"experiment '{exp_id}' is missing 'id'")
+        elif record["id"] != exp_id:
+            errors.append(
+                f"experiment '{exp_id}' has a mismatched 'id' field: {record['id']!r}"
+            )
+
+        for ts_field in ("created_at", "updated_at"):
+            if ts_field not in record:
+                warnings.append(f"experiment '{exp_id}' is missing '{ts_field}'")
+            elif not _is_iso(record[ts_field]):
+                warnings.append(
+                    f"experiment '{exp_id}' has an unparseable '{ts_field}': "
+                    f"{record[ts_field]!r}"
+                )
+
+        if (
+            _is_iso(record.get("created_at"))
+            and _is_iso(record.get("updated_at"))
+            and record["updated_at"] < record["created_at"]
+        ):
+            warnings.append(f"experiment '{exp_id}' has 'updated_at' before 'created_at'")
+
+        missing = [f for f in required_fields if f not in record]
+        if missing:
+            warnings.append(
+                f"experiment '{exp_id}' is missing required field(s): "
+                f"{', '.join(sorted(missing))}"
+            )
+
+    known = set(experiment_ids)
+    reported = set()
+    for edge in links:
+        for endpoint in edge:
+            if endpoint not in known and endpoint not in reported:
+                reported.add(endpoint)
+                warnings.append(f"link references unknown experiment '{endpoint}'")
+
+    return {"errors": errors, "warnings": warnings}
