@@ -268,3 +268,11 @@ appended data point), and no multi-user concurrency story. If you need any
 of that, reach for something like MLflow instead. dexpter is for the "just
 let me log arbitrary stuff about a run in a file I can read/diff/edit
 myself" use case.
+
+## Development
+
+Tests are standard-library `unittest` — no test dependencies:
+
+```bash
+python -m unittest discover
+```
