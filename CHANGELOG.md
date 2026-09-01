@@ -8,6 +8,23 @@ All notable changes to dexpter are documented here. The format is based on
 
 Nothing yet.
 
+## [1.0.1] - 2026-08-31
+
+First release on PyPI. No library or CLI behaviour changed since 1.0.0.
+
+### Added
+
+- Published to PyPI — `pip install dexpter`.
+- GitHub Actions workflow (`.github/workflows/publish.yml`) that builds and
+  uploads to PyPI via Trusted Publishing whenever a GitHub release is
+  published.
+- CI status badge in the README.
+
+### Changed
+
+- Install instructions now cover both PyPI and installing from a source
+  checkout.
+
 ## [1.0.0] - 2026-08-28
 
 Initial release.
@@ -55,5 +72,6 @@ Initial release.
   (`python -m unittest discover`).
 - `dexpter.__version__`.
 
-[Unreleased]: https://github.com/rjapplin/dexpter/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/rjapplin/dexpter/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/rjapplin/dexpter/releases/tag/v1.0.1
 [1.0.0]: https://github.com/rjapplin/dexpter/releases/tag/v1.0.0

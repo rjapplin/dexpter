@@ -24,18 +24,22 @@ happily support whatever fits your flow.
 
 ## Install
 
-From the dexpter project directory (this repo):
+From PyPI:
 
 ```bash
-pip install -e /path/to/dexpter
+pip install dexpter
 ```
 
-Use `-e` (editable) if dexpter's own source may still change and you want
-that reflected immediately without reinstalling. Drop `-e` for a normal
-pinned install. This works from any other project's venv — dexpter doesn't
-need to be published anywhere; pip builds it from the local path.
+From source — clone or download the repo, then install it:
 
-Installing gives you both:
+```bash
+git clone https://github.com/rjapplin/dexpter
+cd dexpter
+pip install .          # normal install
+pip install -e .       # editable: source edits apply without reinstalling
+```
+
+Both work from any project's virtualenv. Either way you get:
 - the `dexpter` Python package (`from dexpter import Dexpter, DexpterError`)
 - a `dexpter` CLI command
 

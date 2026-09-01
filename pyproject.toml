@@ -1,6 +1,6 @@
 [project]
 name = "dexpter"
-version = "1.0.0"
+version = "1.0.1"
 description = "Lightweight, flexible JSON-backed data science experiment tracker"
 readme = "README.md"
 requires-python = ">=3.9"
