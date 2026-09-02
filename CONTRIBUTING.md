@@ -12,7 +12,7 @@ on top of the public API and get it exactly right, it belongs in
 `examples/recipes/`, not the core.
 
 Please open an issue before starting a feature PR so we can agree on whether
-it's a core change or a recipe.
+it's a core change or a recipe. See below for more deetails on submitting changes.
 
 ## Ground rules
 
